@@ -961,9 +961,46 @@ class elfio
                              Elf_Xword&         segment_filesize,
                              const Elf_Xword&   seg_start_pos )
     {
+
+
+        // Find the idx of the .text section, and the idx of the first .text.symbol section
+        Elf_Half text_idx, my_idx, k, idx;
+        bool text_segment = false;
+        for ( Elf_Half j = 0; j < seg->get_sections_num(); ++j ) {
+            section * sec = sections[seg->get_section_index_at( j )];
+            if (sec->get_name() == ".text") {
+                text_idx = j;
+                text_segment = true;
+            } else if (sec->get_name().compare(0, 5, ".text") == 0) {
+                my_idx = j;
+                break;
+            }
+        }
+   
+        // k will be our j offset from the text section
+        k = -1;
         for ( Elf_Half j = 0; j < seg->get_sections_num(); ++j ) {
             Elf_Half index = seg->get_section_index_at( j );
 
+            // We want to insert the newly splitted sections in between 
+            if (text_segment) {
+                // Found the .text section, skip it and then insert into it
+                if (j == text_idx) {
+                    k = 0;
+                    continue;
+                } else if (seg->get_sections_num() == k + my_idx &&  my_idx > text_idx) {
+                    k = 1;
+                }
+
+                if (j > text_idx + seg->get_sections_num() - my_idx) {
+                    index = seg->get_section_index_at(text_idx + k);
+                    k += 1;
+                } else if (k >= 0 && k < seg->get_sections_num() - my_idx) {
+                    // We're now inserting .text.symbol sections in between
+                    index = seg->get_section_index_at(my_idx + k);
+                    k += 1;
+                } 
+            }
             section* sec = sections[index];
 
             // The NULL section is always generated
@@ -988,6 +1025,7 @@ class elfio
                     return false;
                 }
                 section_align = req_offset - cur_offset;
+
             }
             else if ( !section_generated[index] &&
                       !sec->is_address_initialized() ) {
