@@ -85,6 +85,18 @@ class segment
     //! \brief Free the data of the segment
     virtual void free_data() const = 0;
 
+
+    //------------------------------------------------------------------------------
+    //! \brief Insert a section into the segment
+    //! \param psec Pointer to the section
+    //! \param addr_align Alignment of the section
+    //! \param pos Position to insert the section
+    //! \return Index of the inserted section
+    // ! MINLIB: Added to avoid duplicating split sections for minlib
+    virtual Elf_Half insert_section( section*  psec,
+                                        Elf_Xword addr_align,
+                                        Elf_Half  pos ) = 0;
+
     //------------------------------------------------------------------------------
     //! \brief Add a section to the segment
     //! \param psec Pointer to the section
@@ -212,6 +224,23 @@ template <class T> class segment_impl : public segment
             set_align( addr_align );
         }
 
+        return (Elf_Half)sections.size();
+    }
+
+    //------------------------------------------------------------------------------
+    //! \brief Insert a section into the segment
+    //! \param psec Pointer to the section
+    //! \param addr_align Alignment of the section
+    //! \param pos Position to insert the section
+    //! \return Index of the inserted section
+    // ! MINLIB: Added to avoid duplicating split sections for minlib
+    Elf_Half insert_section( section*  psec, Elf_Xword addr_align, Elf_Half pos ) override
+    {
+        Elf_Half sec_idx = psec->get_index();
+        sections.insert(sections.begin() + pos, sec_idx);
+        if (addr_align > get_align()) {
+            set_align(addr_align);
+        }
         return (Elf_Half)sections.size();
     }
 

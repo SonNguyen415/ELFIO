@@ -41,6 +41,9 @@ class section
   public:
     virtual ~section() = default;
 
+    // ! MINLIB: Added to avoid duplicating split sections for minlib
+    bool is_split = false; 
+
     ELFIO_GET_ACCESS_DECL( Elf_Half, index );
     ELFIO_GET_SET_ACCESS_DECL( std::string, name );
     ELFIO_GET_SET_ACCESS_DECL( Elf_Word, type );
@@ -172,6 +175,9 @@ template <class T> class section_impl : public section
           compression( compression )
     {
     }
+
+    // ! MINLIB: Added to avoid duplicating split sections for minlib
+    bool is_split = false;
 
     // Section info functions
     ELFIO_GET_SET_ACCESS( Elf_Word, type, header.sh_type );

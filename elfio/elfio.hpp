@@ -970,6 +970,11 @@ class elfio
 
             section* sec = sections[index];
 
+            // ! MINLIB: Added to avoid duplicating split .text sections for minlib
+            if (sec->is_split && (sec->get_name() == ".text" || sec->get_name() == ".bss" || sec->get_name() == ".data" || sec->get_name() == ".rodata")) {
+                continue;
+            }
+
             // The NULL section is always generated
             if ( SHT_NULL == sec->get_type() ) {
                 section_generated[index] = true;
