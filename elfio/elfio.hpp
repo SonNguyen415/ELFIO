@@ -500,6 +500,39 @@ class elfio
         return new_section;
     }
 
+    //! MINLIB: Added to create a  section at a specific index, shifting existing sections if necessary
+    section* create_section_at(size_t index)
+    {
+        if (index > sections_.size()) {
+            // Index is out of range
+            return nullptr;
+        }
+
+        std::unique_ptr<section> new_sec;
+
+        if ( auto file_class = get_class(); file_class == ELFCLASS64 ) {
+            new_sec = std::make_unique<section_impl<Elf64_Shdr>>(convertor, addr_translator, compression);
+        }
+        else if (file_class == ELFCLASS32) {
+            new_sec = std::make_unique<section_impl<Elf32_Shdr>>(convertor, addr_translator, compression);
+        }
+        else {
+            return nullptr;
+        }
+
+        // Insert the new section at the desired index
+        auto it = sections_.begin() + index;
+        sections_.insert(it, std::move(new_sec));
+
+        // Update all indices starting from the inserted section
+        for (size_t i = index; i < sections_.size(); ++i) {
+            sections_[i]->set_index(static_cast<Elf_Half>(i));
+        }
+
+        return sections_[index].get();
+    }
+
+
     //------------------------------------------------------------------------------
     //! \brief Create a new segment
     //! \return Pointer to the created segment
@@ -971,9 +1004,9 @@ class elfio
             section* sec = sections[index];
 
             // ! MINLIB: Added to avoid duplicating split .text sections for minlib
-            if (sec->is_split && (sec->get_name() == ".text" || sec->get_name() == ".bss" || sec->get_name() == ".data" || sec->get_name() == ".rodata")) {
-                continue;
-            }
+            // if (sec->is_split && (sec->get_name() == ".text" || sec->get_name() == ".bss" || sec->get_name() == ".data" || sec->get_name() == ".rodata")) {
+            //     continue;
+            // }
 
             // The NULL section is always generated
             if ( SHT_NULL == sec->get_type() ) {
@@ -1108,21 +1141,32 @@ class elfio
 
             return sec;
         }
+        
 
         //------------------------------------------------------------------------------
-        //! \brief Add a new section
+        //! MINLIB: Added to allow insert at specific index
+        //! \brief Add a new section at a specific index
         //! \param name The name of the section
+        //! \param index Optional index where to insert. If omitted, append at end
         //! \return Pointer to the created section
-        section* add( const std::string& name ) const
+        section* add(const std::string& name, size_t index = SIZE_MAX) const
         {
-            section* new_section = parent->create_section();
-            new_section->set_name( name );
+            section* new_section = (index == SIZE_MAX)
+                ? parent->create_section()                // append
+                : parent->create_section_at(index);      // insert at index
 
+            if (!new_section) {
+                return nullptr; // failed to create
+            }
+
+            new_section->set_name(name);
+
+            // Update section string table
             Elf_Half str_index = parent->get_section_name_str_index();
-            section* string_table( parent->sections_[str_index].get() );
-            string_section_accessor str_writer( string_table );
-            Elf_Word                pos = str_writer.add_string( name );
-            new_section->set_name_string_offset( pos );
+            section* string_table = parent->sections_[str_index].get();
+            string_section_accessor str_writer(string_table);
+            Elf_Word pos = str_writer.add_string(name);
+            new_section->set_name_string_offset(pos);
 
             return new_section;
         }
